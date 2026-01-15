@@ -1,0 +1,19 @@
+# Xcode
+xcuserdata/
+DerivedData/
+build/
+
+# macOS
+.DS_Store
+
+# VSCode
+.vscode/
+
+# Debug symbols
+*.dSYM.zip
+*.dSYM
+
+# Archives & Build output
+*.xcarchive
+*.app
+*.ipa
