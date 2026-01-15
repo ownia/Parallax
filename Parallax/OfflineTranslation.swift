@@ -12,6 +12,9 @@ private var activeTranslationHelper: OfflineTranslationHelper?
 extension TranslationService {
     
     func translateOffline(blocks: [TextBlock], to targetLang: String, completion: @escaping ([TextBlock], Bool) -> Void) {
+        let profilerToken = PerformanceProfiler.shared.begin(.translationOffline)
+        profilerToken?.addMetadata(key: "blockCount", value: blocks.count)
+        
         let targetLanguage = languageFromCode(targetLang)
         let sourceLanguage = guessSourceLanguage(for: targetLang)
         
@@ -29,11 +32,13 @@ extension TranslationService {
                         sourceLanguage: sourceLanguage,
                         targetLanguage: targetLanguage,
                         targetLangCode: targetLang,
+                        profilerToken: profilerToken,
                         completion: completion
                     )
                     
                 case .supported:
                     // Language pack needs to be downloaded, show download prompt
+                    PerformanceProfiler.shared.end(profilerToken)
                     self.showLanguageDownloadPrompt(
                         blocks: blocks,
                         sourceLanguage: sourceLanguage,
@@ -45,9 +50,11 @@ extension TranslationService {
                 case .unsupported:
                     // Language pair not supported, fallback to online
                     print("[!] Language pair not supported for offline translation, falling back to online")
+                    PerformanceProfiler.shared.end(profilerToken)
                     self.translateOnline(blocks: blocks, to: targetLang, completion: completion)
                     
                 @unknown default:
+                    PerformanceProfiler.shared.end(profilerToken)
                     self.translateOnline(blocks: blocks, to: targetLang, completion: completion)
                 }
             }
@@ -59,6 +66,7 @@ extension TranslationService {
         sourceLanguage: Locale.Language,
         targetLanguage: Locale.Language,
         targetLangCode: String,
+        profilerToken: PerformanceProfiler.ProfileToken?,
         completion: @escaping ([TextBlock], Bool) -> Void
     ) {
         DispatchQueue.main.async {
@@ -67,7 +75,8 @@ extension TranslationService {
                 sourceLanguage: sourceLanguage,
                 targetLanguage: targetLanguage,
                 targetLangCode: targetLangCode,
-                service: self
+                service: self,
+                profilerToken: profilerToken
             ) { results, success in
                 activeTranslationHelper = nil
                 completion(results, success)
@@ -194,6 +203,7 @@ private class OfflineTranslationHelper {
     let targetLanguage: Locale.Language
     let targetLangCode: String
     weak var service: TranslationService?
+    let profilerToken: PerformanceProfiler.ProfileToken?
     let completion: ([TextBlock], Bool) -> Void
     
     private var window: NSWindow?
@@ -203,12 +213,14 @@ private class OfflineTranslationHelper {
          targetLanguage: Locale.Language,
          targetLangCode: String,
          service: TranslationService,
+         profilerToken: PerformanceProfiler.ProfileToken?,
          completion: @escaping ([TextBlock], Bool) -> Void) {
         self.blocks = blocks
         self.sourceLanguage = sourceLanguage
         self.targetLanguage = targetLanguage
         self.targetLangCode = targetLangCode
         self.service = service
+        self.profilerToken = profilerToken
         self.completion = completion
     }
     
@@ -218,7 +230,8 @@ private class OfflineTranslationHelper {
             sourceLanguage: sourceLanguage,
             targetLanguage: targetLanguage,
             targetLangCode: targetLangCode,
-            service: service
+            service: service,
+            profilerToken: profilerToken
         ) { [weak self] results, success in
             DispatchQueue.main.async {
                 self?.completion(results, success)
@@ -257,6 +270,7 @@ private struct TranslationHelperView: View {
     let targetLanguage: Locale.Language
     let targetLangCode: String
     weak var service: TranslationService?
+    let profilerToken: PerformanceProfiler.ProfileToken?
     let completion: ([TextBlock], Bool) -> Void
     
     @State private var configuration: TranslationSession.Configuration?
@@ -309,6 +323,7 @@ private struct TranslationHelperView: View {
             }
         }
         
+        PerformanceProfiler.shared.end(profilerToken)
         completion(translatedBlocks, !hasError)
     }
 }

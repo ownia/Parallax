@@ -10,6 +10,9 @@ class OverlayWindowController {
     private let fontCacheLock = NSLock()
     
     func show(with blocks: [TextBlock], on screen: NSScreen? = nil) {
+        let profilerToken = PerformanceProfiler.shared.begin(.overlayRender)
+        profilerToken?.addMetadata(key: "blockCount", value: blocks.count)
+        
         hide()
         
         let targetScreen = screen ?? NSScreen.main
@@ -44,6 +47,8 @@ class OverlayWindowController {
         window.orderFrontRegardless()
         overlayWindow = window
         currentScreen = targetScreen
+        
+        PerformanceProfiler.shared.end(profilerToken)
     }
     
     /// Update translations without re-capturing screen

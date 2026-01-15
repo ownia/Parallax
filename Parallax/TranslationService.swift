@@ -33,15 +33,25 @@ class TranslationService {
     
     /// Translate text blocks in batch
     func translate(blocks: [TextBlock], to targetLang: String, completion: @escaping ([TextBlock], Bool) -> Void) {
+        let profilerToken = PerformanceProfiler.shared.begin(.translationBatch)
+        profilerToken?.addMetadata(key: "blockCount", value: blocks.count)
+        profilerToken?.addMetadata(key: "targetLang", value: targetLang)
+        
         let mode = Settings.shared.translationMode
         
+        let wrappedCompletion: ([TextBlock], Bool) -> Void = { translatedBlocks, success in
+            profilerToken?.addMetadata(key: "success", value: success)
+            PerformanceProfiler.shared.end(profilerToken)
+            completion(translatedBlocks, success)
+        }
+        
         if mode == .offline && Self.isOfflineAvailable {
-            translateOfflineWrapper(blocks: blocks, to: targetLang, completion: completion)
+            translateOfflineWrapper(blocks: blocks, to: targetLang, completion: wrappedCompletion)
         } else {
             if mode == .offline {
                 print("[!] Offline translation requires macOS 15.0+, falling back to online")
             }
-            translateOnline(blocks: blocks, to: targetLang, completion: completion)
+            translateOnline(blocks: blocks, to: targetLang, completion: wrappedCompletion)
         }
     }
     
@@ -56,6 +66,9 @@ class TranslationService {
     // MARK: - Online Translation (Google API)
     
     func translateOnline(blocks: [TextBlock], to targetLang: String, completion: @escaping ([TextBlock], Bool) -> Void) {
+        let profilerToken = PerformanceProfiler.shared.begin(.translationOnline)
+        profilerToken?.addMetadata(key: "blockCount", value: blocks.count)
+        
         var translatedBlocks: [TextBlock] = Array(repeating: TextBlock(rect: .zero, text: ""), count: blocks.count)
         var hasError = false
         let lock = NSLock()
@@ -98,6 +111,7 @@ class TranslationService {
         }
         
         group.notify(queue: .main) {
+            PerformanceProfiler.shared.end(profilerToken)
             completion(translatedBlocks, !hasError)
         }
     }

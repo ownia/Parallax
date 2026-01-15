@@ -10,6 +10,9 @@ class OCRService {
     /// - Parameter image: The image to recognize
     /// - Returns: Array of recognized text blocks
     func recognizeText(in image: CGImage) -> [TextBlock] {
+        let profilerToken = PerformanceProfiler.shared.begin(.ocrRecognition)
+        profilerToken?.addMetadata(key: "imageSize", value: "\(image.width)x\(image.height)")
+        
         var results: [TextBlock] = []
         
         let imageWidth = CGFloat(image.width)
@@ -59,6 +62,9 @@ class OCRService {
         } catch {
             print("[!] OCR request failed: \(error.localizedDescription)")
         }
+        
+        profilerToken?.addMetadata(key: "blocksFound", value: results.count)
+        PerformanceProfiler.shared.end(profilerToken)
         
         return results
     }

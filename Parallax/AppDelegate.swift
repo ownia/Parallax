@@ -82,6 +82,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: L("menu.about"), action: #selector(showAbout), keyEquivalent: ""))
+        
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: L("menu.quit"), action: #selector(quitApp), keyEquivalent: "q"))
         
@@ -384,7 +385,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
             
             print("[*] \(L("status.capturing"))")
+            
+            let captureToken = PerformanceProfiler.shared.begin(.screenCapture)
             guard let screenshot = self.captureScreen() else {
+                PerformanceProfiler.shared.end(captureToken)
                 print("[!] \(L("status.failed.capture"))")
                 DispatchQueue.main.async {
                     self.isProcessing = false
@@ -393,6 +397,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 return
             }
+            captureToken?.addMetadata(key: "displayID", value: self.getSelectedScreen().deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? "unknown")
+            PerformanceProfiler.shared.end(captureToken)
             
             print("[*] \(L("status.ocr"))")
             let ocrResults = OCRService.shared.recognizeText(in: screenshot)
