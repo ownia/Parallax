@@ -75,9 +75,9 @@ class TranslationService {
         
         let group = DispatchGroup()
         
-        // Use OperationQueue for better QoS handling
+        // Use higher concurrency for faster processing
         let queue = OperationQueue()
-        queue.maxConcurrentOperationCount = maxConcurrentRequests
+        queue.maxConcurrentOperationCount = 10
         queue.qualityOfService = .userInitiated
         
         for (index, block) in blocks.enumerated() {
@@ -98,7 +98,7 @@ class TranslationService {
                         translatedBlocks[index] = TextBlock(rect: block.rect, text: translatedText)
                     case .failure(let error):
                         print("[!] Translation error: \(error)")
-                        translatedBlocks[index] = TextBlock(rect: block.rect, text: block.text)
+                        translatedBlocks[index] = block
                         hasError = true
                     }
                     lock.unlock()

@@ -292,34 +292,60 @@ private struct TranslationHelperView: View {
     @MainActor
     private func performTranslation(session: TranslationSession) async {
         var translatedBlocks: [TextBlock] = []
-        var hasError = false
+        let hasError = false  // Changed to let constant
         
-        for block in blocks {
-            let trimmedText = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Optimization: Process in parallel batches
+        let batchSize = 5
+        
+        for batchStart in stride(from: 0, to: blocks.count, by: batchSize) {
+            let batchEnd = min(batchStart + batchSize, blocks.count)
+            let batch = Array(blocks[batchStart..<batchEnd])
             
-            if trimmedText.isEmpty {
-                translatedBlocks.append(block)
-                continue
-            }
+            // Capture service reference on MainActor
+            let service = self.service
+            let targetLangCode = self.targetLangCode
             
-            let cacheKey = "\(trimmedText)_\(targetLangCode)_offline"
-            
-            // Check cache
-            if let cached = service?.getCached(key: cacheKey) {
-                translatedBlocks.append(TextBlock(rect: block.rect, text: cached))
-                continue
-            }
-            
-            do {
-                let response = try await session.translate(trimmedText)
-                let translatedText = response.targetText
+            // Process batch in parallel
+            await withTaskGroup(of: (Int, TextBlock).self) { group in
+                for (localIndex, block) in batch.enumerated() {
+                    let globalIndex = batchStart + localIndex
+                    
+                    group.addTask {
+                        let trimmedText = block.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        
+                        if trimmedText.isEmpty {
+                            return (globalIndex, block)
+                        }
+                        
+                        let cacheKey = "\(trimmedText)_\(targetLangCode)_offline"
+                        
+                        // Check cache
+                        if let cached = service?.getCached(key: cacheKey) {
+                            return (globalIndex, TextBlock(rect: block.rect, text: cached))
+                        }
+                        
+                        do {
+                            let response = try await session.translate(trimmedText)
+                            let translatedText = response.targetText
+                            
+                            service?.addToCache(key: cacheKey, value: translatedText)
+                            return (globalIndex, TextBlock(rect: block.rect, text: translatedText))
+                        } catch {
+                            print("[!] Offline translation error: \(error)")
+                            return (globalIndex, block)
+                        }
+                    }
+                }
                 
-                service?.addToCache(key: cacheKey, value: translatedText)
-                translatedBlocks.append(TextBlock(rect: block.rect, text: translatedText))
-            } catch {
-                print("[!] Offline translation error: \(error)")
-                translatedBlocks.append(block)
-                hasError = true
+                // Collect results
+                var batchResults: [(Int, TextBlock)] = []
+                for await result in group {
+                    batchResults.append(result)
+                }
+                
+                // Sort by index and append
+                batchResults.sort { $0.0 < $1.0 }
+                translatedBlocks.append(contentsOf: batchResults.map { $0.1 })
             }
         }
         
