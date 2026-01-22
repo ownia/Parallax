@@ -63,9 +63,11 @@ class OverlayWindowController {
             createDisplayBlock(from: block, scaleFactor: scaleFactor, screenHeight: screenFrame.height)
         }
         
-        // Update content view
-        let contentView = OverlayContentView(frame: window.contentView!.bounds, displayBlocks: displayBlocks)
-        window.contentView = contentView
+        // Update content view asynchronously to avoid layout recursion
+        DispatchQueue.main.async {
+            let contentView = OverlayContentView(frame: window.contentView!.bounds, displayBlocks: displayBlocks)
+            window.contentView = contentView
+        }
     }
     
     func hide() {
