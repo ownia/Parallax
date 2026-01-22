@@ -13,6 +13,7 @@ class Settings {
     private let targetLanguageKey = "targetLanguage"
     private let selectedDisplayKey = "selectedDisplayIndex"
     private let translationModeKey = "translationMode"
+    private let useMetalAccelerationKey = "useMetalAcceleration"
     
     // Supported target languages
     static let supportedLanguages: [(code: String, name: String, localizedName: String)] = [
@@ -66,6 +67,19 @@ class Settings {
         }
         set {
             defaults.set(newValue.rawValue, forKey: translationModeKey)
+        }
+    }
+    
+    var useMetalAcceleration: Bool {
+        get {
+            // Default to true if not set
+            if defaults.object(forKey: useMetalAccelerationKey) == nil {
+                return true
+            }
+            return defaults.bool(forKey: useMetalAccelerationKey)
+        }
+        set {
+            defaults.set(newValue, forKey: useMetalAccelerationKey)
         }
     }
 }

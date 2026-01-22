@@ -476,6 +476,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
             return nil
         }
-        return CGDisplayCreateImage(displayID)
+        
+        // Capture screen using CGDisplayCreateImage
+        guard let rawCapture = CGDisplayCreateImage(displayID) else {
+            return nil
+        }
+        
+        // Optimize capture with Metal if available
+        if Settings.shared.useMetalAcceleration && MetalAccelerator.shared.isAvailable {
+            return MetalAccelerator.shared.optimizeScreenCapture(rawCapture) ?? rawCapture
+        }
+        
+        return rawCapture
     }
 }
