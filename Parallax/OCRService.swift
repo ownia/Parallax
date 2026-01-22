@@ -4,6 +4,9 @@ import AppKit
 class OCRService {
     static let shared = OCRService()
     
+    // Cached configuration to avoid repeated array allocation
+    private let recognitionLanguages = ["en-US", "zh-Hans", "zh-Hant", "ja", "ko"]
+    
     private init() {}
     
     /// Recognize text in an image
@@ -73,8 +76,8 @@ class OCRService {
         
         // Use accurate mode for better recognition results
         request.recognitionLevel = .accurate
-        // Support multiple languages
-        request.recognitionLanguages = ["en-US", "zh-Hans", "zh-Hant", "ja", "ko"]
+        // Support multiple languages (use cached array to avoid repeated allocation)
+        request.recognitionLanguages = recognitionLanguages
         // Use GPU acceleration if available
         request.usesCPUOnly = false
         
